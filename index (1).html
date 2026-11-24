@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Nearby – Meet people around you</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📍</text></svg>">
+<style>
+:root{--bg:#faf7f5;--card:#fff;--text:#1f1a1d;--mute:#6f656b;--line:#ece5e8;--accent:#e8476a;--accent2:#7b5cff;--ok:#1f9d6b;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#17131a;--card:#221c26;--text:#f4eef2;--mute:#a79ca4;--line:#342c39;--accent:#ff6b8b;--accent2:#9b83ff;--ok:#43c996;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+.app{max-width:480px;margin:0 auto;padding:16px 16px 90px}
+h1{font-size:26px;margin:8px 0 4px}
+p.sub{color:var(--mute);margin:0 0 18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:14px;margin-bottom:12px}
+label{display:block;font-weight:600;margin:14px 0 6px;font-size:14px}
+input[type=text],input[type=number],input[type=email],input[type=password]{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--text);font-size:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:8px 14px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--text);font-size:14px;cursor:pointer}
+.chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.emo{font-size:22px;padding:6px 10px}
+.btn{border:0;border-radius:14px;padding:13px 18px;font-size:16px;font-weight:600;background:var(--accent);color:#fff;width:100%;cursor:pointer;margin-top:14px}
+.btn.sm{width:auto;margin:0;padding:9px 16px;font-size:14px}
+.btn.ghost{background:transparent;border:1px solid var(--line);color:var(--text)}
+.btn.ok{background:var(--ok)}
+.row{display:flex;align-items:center;gap:12px}
+.av{width:54px;height:54px;border-radius:50%;display:grid;place-items:center;font-size:26px;flex:none;background:var(--bg);border:1px solid var(--line)}
+.grow{flex:1;min-width:0}
+.name{font-weight:700}
+.mute{color:var(--mute);font-size:13px}
+.tag{display:inline-block;font-size:12px;padding:3px 9px;border-radius:999px;background:var(--bg);border:1px solid var(--line);margin:6px 6px 0 0}
+.badge{font-size:12px;font-weight:600;padding:3px 9px;border-radius:999px;color:#fff}
+.b-dating{background:var(--accent)}.b-friends{background:var(--accent2)}.b-both{background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.switch{display:flex;align-items:center;gap:8px;font-size:14px}
+.tg{width:46px;height:28px;border-radius:999px;background:var(--line);position:relative;cursor:pointer;border:0;flex:none}
+.tg::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:.2s}
+.tg.on{background:var(--ok)}.tg.on::after{left:21px}
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs div{display:flex;width:100%;max-width:480px}
+.tabs button{flex:1;border:0;background:none;color:var(--mute);padding:10px 4px 12px;font-size:12px;cursor:pointer}
+.tabs button span{display:block;font-size:22px}
+.tabs button.on{color:var(--accent);font-weight:700}
+.note{font-size:13px;color:var(--mute);background:var(--card);border:1px dashed var(--line);border-radius:14px;padding:10px 12px;margin:10px 0}
+.chat{display:flex;flex-direction:column;gap:6px;margin:10px 0;height:260px;overflow-y:auto}
+.msg{padding:8px 12px;border-radius:14px;max-width:80%;font-size:15px;word-break:break-word}
+.msg.me{align-self:flex-end;background:var(--accent);color:#fff}
+.msg.them{align-self:flex-start;background:var(--bg);border:1px solid var(--line)}
+.empty{text-align:center;color:var(--mute);padding:30px 10px}
+a.l{color:var(--mute)}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+</head>
+<body>
+<div class="app" id="app"><div class="empty">Loading…</div></div>
+<script>
+var SB_URL="https://vbaweeqfrwsgulpscbpa.supabase.co";
+var SB_KEY="sb_publishable_X54kwA5duiUj9BmqwsTYXw_NGJp-13U";
+var sb=supabase.createClient(SB_URL,SB_KEY);
+var user=null,me=null,list=[],reqs=[],people={},tab="nearby",filter="all",same=false,rad=0;
+var editing=false,pf=null,locMsg="",chatWith=null,msgs=[],chan=null,busy=false;
+var TAGS=["Coffee","Music","Books","Travel","Food","Movies","Hiking","Gaming","Art","Fitness"];
+var EMO=["🙂","😎","🧑‍🎨","🏃","📚","🎸","🌿","🎮"];
+var COUNTRIES=["Afghanistan","Algeria","Argentina","Australia","Bangladesh","Brazil","Cameroon","Canada","Chile","China","Colombia","Egypt","Ethiopia","France","Germany","Ghana","India","Indonesia","Iran","Iraq","Ireland","Italy","Japan","Kenya","Malaysia","Mexico","Morocco","Nepal","Netherlands","Nigeria","Pakistan","Peru","Philippines","Poland","Russia","Saudi Arabia","Somalia","South Africa","South Korea","Spain","Sri Lanka","Sudan","Tanzania","Thailand","Turkey","Uganda","Ukraine","United Kingdom","United States","Venezuela","Vietnam","Zimbabwe"];
+var app=document.getElementById("app");
+function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+function badge(i){return '<span class="badge b-'+esc(i)+'">'+({dating:"Dating",friends:"Friends",both:"Dating & friends"})[i]+'</span>'}
+function distTxt(d){return d==null?"Distance not shared":d<1.5?"less than 2 km away":"about "+Math.round(d)+" km away"}
+
+sb.auth.onAuthStateChange(function(ev,s){setTimeout(function(){setUser(s)},0)});
+
+async function setUser(s){
+  var u=s?s.user:null;
+  if((u&&u.id)===(user&&user.id)&&ev_ok)return;
+  user=u;ev_ok=true;
+  if(!user){me=null;if(chan){sb.removeChannel(chan);chan=null}return authView()}
+  await loadMe();
+}
+var ev_ok=false;
+async function loadMe(){
+  busy=true;
+  var r=await sb.from("profiles").select("id,name,age,country,intent,tags,emoji,visible").eq("id",user.id).maybeSingle();
+  me=r.data;busy=false;
+  if(!me){pf=null;return setup()}
+  await refresh();render();subscribe();
+}
+async function refresh(){
+  var a=await sb.rpc("nearby_profiles",{max_km:rad||null});list=a.data||[];
+  var b=await sb.from("requests").select("*");reqs=b.data||[];
+  list.forEach(function(p){people[p.id]=p});
+  var need={};reqs.forEach(function(r){var o=r.from_id===user.id?r.to_id:r.from_id;if(!people[o])need[o]=1});
+  var ids=Object.keys(need);
+  if(ids.length){var c=await sb.from("profiles").select("id,name,age,country,intent,tags,emoji").in("id",ids);(c.data||[]).forEach(function(p){people[p.id]=p})}
+}
+function subscribe(){
+  if(chan)return;
+  chan=sb.channel("rt-"+user.id)
+   .on("postgres_changes",{event:"*",schema:"public",table:"requests"},function(){if(!chatWith&&!editing)refresh().then(render)})
+   .on("postgres_changes",{event:"INSERT",schema:"public",table:"messages",filter:"to_id=eq."+user.id},function(p){if(chatWith===p.new.from_id){msgs.push(p.new);paint()}})
+   .subscribe();
+}
+
+function authView(msg){
+  app.innerHTML='<h1>Nearby 📍</h1><p class="sub">Meet people near you for dating or friendship.</p>'+
+  '<label>Email</label><input type="email" id="em" autocomplete="email">'+
+  '<label>Password (6+ characters)</label><input type="password" id="pw" autocomplete="current-password">'+
+  '<button class="btn" onclick="login()">Log in</button><button class="btn ghost" onclick="signup()">Create account</button>'+
+  (msg?'<div class="note">'+esc(msg)+'</div>':'')+'<div class="note">You must be 18 or older. We only store your location rounded to about 1 km.</div>';
+}
+async function login(){
+  var r=await sb.auth.signInWithPassword({email:em.value.trim(),password:pw.value});
+  if(r.error)authView(r.error.message);
+}
+async function signup(){
+  var r=await sb.auth.signUp({email:em.value.trim(),password:pw.value});
+  if(r.error)return authView(r.error.message);
+  if(!r.data.session)authView("Check your email and tap the confirmation link, then log in.");
+}
+
+function render(){
+  if(!me||editing||chatWith)return;
+  var h='<div class="top"><h1>Nearby</h1><div class="switch">Visible<button class="tg '+(me.visible!==false?'on':'')+'" onclick="toggleVis()" aria-label="Toggle visibility"></button></div></div>';
+  if(tab==="nearby")h+=nearby();
+  if(tab==="chats")h+=chatsList();
+  if(tab==="me")h+=meView();
+  var pend=reqs.filter(function(r){return r.to_id===user.id&&r.status==="pending"}).length;
+  h+='<div class="tabs"><div>'+[["nearby","📍","Nearby"],["chats","💬","Chats"+(pend?" ("+pend+")":"")],["me","👤","Me"]].map(function(x){return '<button class="'+(tab===x[0]?'on':'')+'" onclick="go(\''+x[0]+'\')"><span>'+x[1]+'</span>'+x[2]+'</button>'}).join("")+'</div></div>';
+  app.innerHTML=h;
+}
+function go(t){tab=t;render()}
+function setup(){
+  if(!pf)pf=me?{name:me.name,age:me.age,country:me.country,intent:me.intent,tags:(me.tags||[]).slice(),emoji:me.emoji||"🙂",lat:null,lng:null}:{name:"",age:"",country:"",intent:"both",tags:[],emoji:"🙂",lat:null,lng:null};
+  var f=pf;
+  app.innerHTML='<h1>'+(me?"Edit profile":"Create your profile")+'</h1><p class="sub">Tell people a little about you.</p>'+
+  '<label>Your name</label><input type="text" maxlength="30" value="'+esc(f.name)+'" oninput="pf.name=this.value">'+
+  '<label>Age</label><input type="number" min="18" max="99" value="'+esc(f.age)+'" oninput="pf.age=this.value" placeholder="18+">'+
+  '<label>Native country</label><input type="text" list="cl" maxlength="40" value="'+esc(f.country)+'" oninput="pf.country=this.value" placeholder="Where are you originally from?"><datalist id="cl">'+COUNTRIES.map(function(c){return '<option value="'+c+'">'}).join("")+'</datalist>'+
+  '<label>Photo style</label><div class="chips">'+EMO.map(function(e){return '<button class="chip emo '+(f.emoji===e?'on':'')+'" onclick="pf.emoji=\''+e+'\';setup()">'+e+'</button>'}).join("")+'</div>'+
+  '<label>I’m looking for</label><div class="chips">'+[["dating","Dating"],["friends","Friends"],["both","Both"]].map(function(x){return '<button class="chip '+(f.intent===x[0]?'on':'')+'" onclick="pf.intent=\''+x[0]+'\';setup()">'+x[1]+'</button>'}).join("")+'</div>'+
+  '<label>Interests</label><div class="chips">'+TAGS.map(function(t){return '<button class="chip '+(f.tags.indexOf(t)>-1?'on':'')+'" onclick="tagTog(\''+t+'\')">'+t+'</button>'}).join("")+'</div>'+
+  '<label>Location</label><button class="btn ghost sm" onclick="getLoc()">📍 '+(f.lat!=null?"Location ready":"Use my location")+'</button><div class="mute" style="margin-top:6px">'+(locMsg||"Needed to show how far people are. Rounded to about 1 km.")+'</div>'+
+  '<button class="btn" onclick="save()">'+(me?"Save changes":"Join Nearby")+'</button>'+(me?'<button class="btn ghost" onclick="editing=false;pf=null;render()">Cancel</button>':'<button class="btn ghost" onclick="sb.auth.signOut()">Log out</button>');
+}
+function tagTog(t){var k=pf.tags.indexOf(t);k>-1?pf.tags.splice(k,1):pf.tags.push(t);setup()}
+function getLoc(){
+  if(!navigator.geolocation){locMsg="Location isn’t available on this device.";setup();return}
+  locMsg="Getting location…";setup();
+  navigator.geolocation.getCurrentPosition(function(p){pf.lat=Math.round(p.coords.latitude*100)/100;pf.lng=Math.round(p.coords.longitude*100)/100;locMsg="Location saved (rounded to about 1 km).";setup()},
+  function(){locMsg="Couldn’t get location. Allow location in your browser and try again.";setup()},{timeout:10000});
+}
+async function save(){
+  var a=parseInt(pf.age,10);
+  if(!pf.name.trim())return alert("Please enter your name.");
+  if(!(a>=18))return alert("You must be 18 or older to use this app.");
+  if(!pf.country.trim())return alert("Please enter your native country.");
+  var d={name:pf.name.trim(),age:a,country:pf.country.trim(),intent:pf.intent,tags:pf.tags,emoji:pf.emoji};
+  if(pf.lat!=null)d.location="SRID=4326;POINT("+pf.lng+" "+pf.lat+")";
+  var r=me?await sb.from("profiles").update(d).eq("id",user.id):await sb.from("profiles").insert(Object.assign({id:user.id},d));
+  if(r.error)return alert("Couldn’t save: "+r.error.message);
+  editing=false;pf=null;await loadMe();
+}
+function status(id){
+  var o=reqs.filter(function(r){return r.from_id===user.id&&r.to_id===id})[0],i=reqs.filter(function(r){return r.from_id===id&&r.to_id===user.id})[0];
+  if((o&&o.status==="accepted")||(i&&i.status==="accepted"))return"connected";
+  if(i)return"incoming";if(o)return"sent";return"none";
+}
+function nearby(){
+  var h='<div class="chips" style="margin-bottom:10px">'+[["all","All"],["dating","Dating"],["friends","Friends"]].map(function(x){return '<button class="chip '+(filter===x[0]?'on':'')+'" onclick="filter=\''+x[0]+'\';render()">'+x[1]+'</button>'}).join("")+'<button class="chip '+(same?'on':'')+'" onclick="same=!same;render()">🌍 Same country</button></div>';
+  h+='<div class="chips" style="margin-bottom:12px">'+[[0,"Any distance"],[10,"10 km"],[50,"50 km"]].map(function(x){return '<button class="chip '+(rad===x[0]?'on':'')+'" onclick="setRad('+x[0]+')">'+x[1]+'</button>'}).join("")+'</div>';
+  if(me.visible===false)h+='<div class="note">You’re hidden. Others can’t see you.</div>';
+  var mc=(me.country||"").toLowerCase();
+  var l=list.filter(function(p){return(filter==="all"||p.intent===filter||p.intent==="both")&&(!same||(p.country||"").toLowerCase()===mc)}).sort(function(a,b){return(a.dist_km==null?1e9:a.dist_km)-(b.dist_km==null?1e9:b.dist_km)});
+  if(!l.length)return h+'<div class="empty">No one found yet.<br>Invite friends to join!</div>';
+  h+=l.map(function(p){
+    var s=status(p.id),b;
+    if(s==="none")b='<button class="btn sm" onclick="connect(\''+p.id+'\')">Connect</button>';
+    else if(s==="sent")b='<button class="btn sm ghost" disabled>Requested</button>';
+    else if(s==="incoming")b='<button class="btn sm ok" onclick="accept(\''+p.id+'\')">Accept</button>';
+    else b='<button class="btn sm ok" onclick="openChat(\''+p.id+'\')">Say hi</button>';
+    var sh=(p.tags||[]).filter(function(t){return(me.tags||[]).indexOf(t)>-1});
+    return '<div class="card"><div class="row"><div class="av">'+esc(p.emoji||"🙂")+'</div><div class="grow"><div class="name">'+esc(p.name)+', '+esc(p.age)+'</div><div class="mute">📍 '+distTxt(p.dist_km)+'</div><div class="mute">🌍 From '+esc(p.country)+'</div><div style="margin-top:4px">'+badge(p.intent)+'</div></div>'+b+'</div>'+
+    '<div>'+(p.tags||[]).map(function(t){return '<span class="tag">'+(sh.indexOf(t)>-1?'✨ ':'')+esc(t)+'</span>'}).join("")+'</div>'+
+    '<div class="mute" style="margin-top:8px"><a class="l" href="#" onclick="block(\''+p.id+'\');return false">Block</a></div></div>'}).join("");
+  return h+'<div class="note">Tip: meet in a public place first and tell a friend where you’re going.</div>';
+}
+async function setRad(r){rad=r;await refresh();render()}
+async function connect(id){var r=await sb.from("requests").insert({from_id:user.id,to_id:id});if(r.error)return alert("Couldn’t send: "+r.error.message);await refresh();render()}
+async function accept(id){var r=await sb.from("requests").update({status:"accepted"}).eq("from_id",id).eq("to_id",user.id);if(r.error)return alert(r.error.message);await refresh();render()}
+async function decline(id){await sb.from("requests").delete().eq("from_id",id).eq("to_id",user.id);await refresh();render()}
+async function block(id){if(!confirm("Block this person? You’ll both be hidden from each other."))return;var r=await sb.from("blocks").insert({blocker:user.id,blocked:id});if(r.error)return alert(r.error.message);await refresh();render()}
+async function toggleVis(){var v=me.visible===false;var r=await sb.from("profiles").update({visible:v}).eq("id",user.id);if(!r.error){me.visible=v;render()}}
+
+function chatsList(){
+  var inc=reqs.filter(function(r){return r.to_id===user.id&&r.status==="pending"&&people[r.from_id]});
+  var con=Object.keys(people).filter(function(id){return status(id)==="connected"});
+  var h="";
+  if(inc.length)h+='<h1 style="font-size:17px">Requests</h1>'+inc.map(function(r){var p=people[r.from_id];return '<div class="card row"><div class="av">'+esc(p.emoji||"🙂")+'</div><div class="grow"><div class="name">'+esc(p.name)+', '+esc(p.age)+'</div><div class="mute">From '+esc(p.country)+'</div></div><button class="btn sm ok" onclick="accept(\''+p.id+'\')">Accept</button><button class="btn sm ghost" onclick="decline(\''+p.id+'\')">✕</button></div>'}).join("");
+  if(con.length)h+='<h1 style="font-size:17px">Connections</h1>'+con.map(function(id){var p=people[id];return '<div class="card row" style="cursor:pointer" onclick="openChat(\''+id+'\')"><div class="av">'+esc(p.emoji||"🙂")+'</div><div class="grow"><div class="name">'+esc(p.name)+'</div><div class="mute">Tap to chat</div></div></div>'}).join("");
+  return h||'<div class="empty">No chats yet.<br>Connect with someone on the Nearby tab.</div>';
+}
+async function openChat(id){
+  chatWith=id;tab="chats";msgs=[];var p=people[id]||{},me_=user.id;
+  app.innerHTML='<div class="card"><div class="row"><button class="btn sm ghost" onclick="chatWith=null;render()">←</button><div class="av" style="width:40px;height:40px;font-size:20px">'+esc(p.emoji||"🙂")+'</div><div class="name">'+esc(p.name)+'</div></div><div class="chat" id="ch"></div><div class="row"><input type="text" id="mi" placeholder="Type a message" style="flex:1" onkeydown="if(event.key===\'Enter\')send()"><button class="btn sm" onclick="send()">Send</button></div></div>';
+  var r=await sb.from("messages").select("*").or("and(from_id.eq."+me_+",to_id.eq."+id+"),and(from_id.eq."+id+",to_id.eq."+me_+")").order("created_at").limit(200);
+  msgs=r.data||[];paint();
+}
+function paint(){var c=document.getElementById("ch");if(!c)return;c.innerHTML=msgs.length?msgs.map(function(m){return '<div class="msg '+(m.from_id===user.id?"me":"them")+'">'+esc(m.body)+'</div>'}).join(""):'<div class="empty">Say hello 👋</div>';c.scrollTop=c.scrollHeight}
+async function send(){
+  var i=document.getElementById("mi"),t=i.value.trim();if(!t||!chatWith)return;i.value="";
+  var r=await sb.from("messages").insert({from_id:user.id,to_id:chatWith,body:t.slice(0,500)}).select().single();
+  if(r.error)return alert("Couldn’t send: "+r.error.message);
+  msgs.push(r.data);paint();
+}
+function meView(){
+  return '<div class="card"><div class="row"><div class="av">'+esc(me.emoji||"🙂")+'</div><div class="grow"><div class="name">'+esc(me.name)+', '+esc(me.age)+'</div><div class="mute">🌍 From '+esc(me.country)+'</div><div style="margin-top:4px">'+badge(me.intent)+'</div></div></div><div>'+(me.tags||[]).map(function(t){return '<span class="tag">'+esc(t)+'</span>'}).join("")+'</div></div>'+
+  '<button class="btn ghost" style="margin-top:0" onclick="editing=true;pf=null;setup()">Edit profile / update location</button>'+
+  '<button class="btn ghost" onclick="sb.auth.signOut()">Log out</button>'+
+  '<button class="btn ghost" onclick="delMe()">Delete my profile and data</button>';
+}
+async function delMe(){
+  if(!confirm("Delete your profile, chats and requests permanently?"))return;
+  var r=await sb.from("profiles").delete().eq("id",user.id);
+  if(r.error)return alert(r.error.message);
+  me=null;pf=null;await sb.auth.signOut();
+}
+</script>
+</body>
+</html>
